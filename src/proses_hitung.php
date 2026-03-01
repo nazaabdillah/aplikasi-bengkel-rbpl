@@ -1,25 +1,6 @@
 <?php
-session_start();
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    $nama = $_POST['nama'] ?? '';
-    $plat_nomor = $_POST['plat_nomor'] ?? '';
-    $jenis_motor = $_POST['jenis_motor'] ?? '';
-    $jenis_servis = $_POST['jenis_servis'] ?? '';
-    
-    $errors = [];
-    if (empty($nama)) $errors[] = "Nama harus diisi";
-    if (empty($plat_nomor)) $errors[] = "Plat nomor harus diisi";
-    if (empty($jenis_motor)) $errors[] = "Jenis motor harus dipilih";
-    if (empty($jenis_servis)) $errors[] = "Jenis servis harus dipilih";
-    
-    
-    if (!empty($errors)) {
-        $_SESSION['errors'] = $errors;
-        header("Location: form_input.php");
-        exit;
-    }
-  
+function hitungBiayaServis($jenis_servis, $jenis_motor, $biaya_tambahan = 0) {
+
     $harga_servis = [
         "Servis Ringan" => 50000,
         "Servis Berkala" => 150000,
@@ -31,8 +12,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         "Perbaikan Rem" => 80000,
         "Cuci Motor" => 25000
     ];
-    
-    $harga_motor = [
+
+    $biaya_motor = [
         "Honda Beat" => 0,
         "Honda Scoopy" => 5000,
         "Honda Vario" => 5000,
@@ -46,39 +27,73 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         "Kawasaki Ninja" => 20000,
         "Lainnya" => 25000
     ];
-    
-    $biaya_servis = $harga_servis[$jenis_servis] ?? 50000; 
-    $biaya_tambahan = $harga_motor[$jenis_motor] ?? 0;
-    $total_biaya = $biaya_servis + $biaya_tambahan;
-    
-    $biaya_spare_part = 0; 
-    
-    $ppn = $total_biaya * 0.1;
-    $grand_total = $total_biaya + $ppn + $biaya_spare_part;
- 
-    $data_servis = [
-        'nama' => $nama,
-        'plat_nomor' => $plat_nomor,
-        'jenis_motor' => $jenis_motor,
+
+    $biaya_jasa = isset($harga_servis[$jenis_servis]) ? $harga_servis[$jenis_servis] : 50000;
+    $biaya_motor_tambahan = isset($biaya_motor[$jenis_motor]) ? $biaya_motor[$jenis_motor] : 0;
+    $subtotal = $biaya_jasa + $biaya_motor_tambahan;
+    $ppn = $subtotal * 0.1;
+    $grand_total = $subtotal + $ppn + $biaya_tambahan;
+
+    $hasil = [
+
+        'biaya_jasa' => $biaya_jasa,
+        'biaya_motor_tambahan' => $biaya_motor_tambahan,
+        'biaya_spare_part' => $biaya_tambahan,
+        'subtotal_sebelum_ppn' => $subtotal,
+        'ppn_10_persen' => $ppn,
+        'total_biaya' => $grand_total,
+
+        'biaya_jasa_rp' => 'Rp ' . number_format($biaya_jasa, 0, ',', '.'),
+        'biaya_motor_tambahan_rp' => 'Rp ' . number_format($biaya_motor_tambahan, 0, ',', '.'),
+        'biaya_spare_part_rp' => 'Rp ' . number_format($biaya_tambahan, 0, ',', '.'),
+        'subtotal_rp' => 'Rp ' . number_format($subtotal, 0, ',', '.'),
+        'ppn_rp' => 'Rp ' . number_format($ppn, 0, ',', '.'),
+        'total_rp' => 'Rp ' . number_format($grand_total, 0, ',', '.'),
+        
         'jenis_servis' => $jenis_servis,
-        'biaya_servis' => $biaya_servis,
-        'biaya_tambahan' => $biaya_tambahan,
-        'biaya_spare_part' => $biaya_spare_part,
-        'sub_total' => $total_biaya,
-        'ppn' => $ppn,
-        'grand_total' => $grand_total,
-        'tanggal' => date('d-m-Y H:i:s'),
-        'no_nota' => 'SRV-' . date('Ymd') . '-' . rand(100, 999)
+        'jenis_motor' => $jenis_motor,
+        'tanggal_hitung' => date('d-m-Y H:i:s'),
+        'no_ref' => 'INV-' . date('Ymd') . '-' . rand(1000, 9999)
     ];
-
-    $_SESSION['data_servis'] = $data_servis;
-
-    header("Location: hasil_struk.php");
-    exit;
     
-} else {
- 
-    header("Location: form_input.php");
-    exit;
+    return $hasil;
+}
+
+function hitungBiayaServisJson($jenis_servis, $jenis_motor, $biaya_tambahan = 0) {
+    $hasil = hitungBiayaServis($jenis_servis, $jenis_motor, $biaya_tambahan);
+    header('Content-Type: application/json');
+    return json_encode($hasil, JSON_PRETTY_PRINT);
+}
+
+function cekKetersediaanServis($jenis_servis, $jenis_motor) {
+    $servis_tersedia = [
+        "Servis Ringan", "Servis Berkala", "Ganti Oli", 
+        "Tune Up", "Ganti Ban", "Perbaikan Mesin", 
+        "Perbaikan Kelistrikan", "Perbaikan Rem", "Cuci Motor"
+    ];
+    
+    $motor_tersedia = [
+        "Honda Beat", "Honda Scoopy", "Honda Vario", "Honda PCX",
+        "Yamaha Mio", "Yamaha Nmax", "Yamaha Aerox", "Yamaha Jupiter",
+        "Suzuki Nex", "Suzuki Satria", "Kawasaki Ninja", "Lainnya"
+    ];
+    
+    $valid = true;
+    $pesan = [];
+    
+    if (!in_array($jenis_servis, $servis_tersedia)) {
+        $valid = false;
+        $pesan[] = "Jenis servis '$jenis_servis' tidak tersedia";
+    }
+    
+    if (!in_array($jenis_motor, $motor_tersedia)) {
+        $valid = false;
+        $pesan[] = "Jenis motor '$jenis_motor' tidak terdaftar";
+    }
+    
+    return [
+        'valid' => $valid,
+        'pesan' => $pesan
+    ];
 }
 ?>
