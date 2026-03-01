@@ -49,5 +49,24 @@
                 <button type="submit">Simpan Data</button>
                 <button type="reset">Reset Data</button>
     </form>
+
+    <script>
+        // Auto uppercase plat nomor
+        document.getElementById('plat_nomor').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+
+        // Validasi form sebelum submit
+        document.getElementById('formPelanggan').addEventListener('submit', function(e) {
+            const nama = document.getElementById('nama').value.trim();
+            const plat = document.getElementById('plat_nomor').value.trim();
+            
+            if (nama === '' || plat === '') {
+                e.preventDefault();
+                alert('Mohon lengkapi semua field yang wajib diisi!');
+                return false;
+            }
+        });
+    </script>
 </body>
 </html>
